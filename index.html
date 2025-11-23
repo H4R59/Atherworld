@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Secured Login - Hars6x</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        body, html {
+            margin: 0; padding: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Montserrat', sans-serif;
+            height: 100vh; width: 100vw;
+            touch-action: none;
+        }
+
+        #canvas-container {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            background: radial-gradient(circle at center, #1c1c1c 0%, #000000 100%);
+        }
+
+        .vignette {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 150px rgba(0,0,0,0.9);
+            pointer-events: none; z-index: 1;
+        }
+
+        /* GLASS PANEL */
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            transform-style: preserve-3d;
+            transition: all 0.3s ease-out;
+            opacity: 1; overflow: hidden;
+        }
+
+        .fade-out {
+            opacity: 0;
+            transform: scale(0.9) rotateX(20deg);
+            filter: blur(10px);
+            pointer-events: none;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* INPUTS */
+        .premium-input-group { position: relative; margin-bottom: 1.5rem; }
+
+        .premium-input {
+            width: 100%; background: transparent;
+            border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff; padding: 10px 0;
+            font-size: 1.1rem; font-weight: 300; letter-spacing: 1px;
+            transition: all 0.3s ease; border-radius: 0;
+        }
+
+        .premium-input:focus {
+            outline: none; border-bottom: 1px solid #d4af37;
+            background: linear-gradient(to bottom, transparent 95%, rgba(212, 175, 55, 0.05) 100%);
+        }
+
+        .premium-input::placeholder { color: transparent; }
+
+        .input-label {
+            position: absolute; top: 10px; left: 0;
+            font-size: 0.8rem; color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase; letter-spacing: 2px;
+            pointer-events: none; transition: all 0.3s ease;
+        }
+
+        .premium-input:focus ~ .input-label,
+        .premium-input:not(:placeholder-shown) ~ .input-label {
+            top: -15px; font-size: 0.65rem; color: #d4af37;
+        }
+
+        /* BUTTON */
+        .gold-btn {
+            background: linear-gradient(135deg, #d4af37 0%, #997d26 100%);
+            color: #000; border: none;
+            font-weight: 600; letter-spacing: 3px;
+            text-transform: uppercase; font-size: 0.8rem;
+            position: relative; overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            cursor: pointer; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+        }
+        .gold-btn:active { transform: scale(0.98); }
+        .error-btn {
+            background: linear-gradient(135deg, #ff4b4b 0%, #b30000 100%) !important;
+            color: white !important; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4) !important;
+        }
+
+        /* SYSTEM ANALYZE BOX (Embedded) */
+        .system-terminal {
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: 3px solid #d4af37;
+            height: 100px; padding: 10px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem; color: #d4af37;
+            overflow: hidden;
+            display: flex; flex-direction: column; justify-content: flex-end;
+        }
+        .log-line { margin: 2px 0; opacity: 0.7; }
+        .log-line.highlight { color: #fff; opacity: 1; text-shadow: 0 0 5px #fff; }
+
+        /* SUCCESS OVERLAY */
+        #success-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 40; pointer-events: none;
+            opacity: 0; transition: opacity 1s ease;
+            text-align: center;
+        }
+
+        .shockwave {
+            position: fixed; top: 50%; left: 50%;
+            width: 0; height: 0; border-radius: 50%;
+            background: rgba(212, 175, 55, 0.1);
+            border: 5px solid rgba(212, 175, 55, 0.8);
+            transform: translate(-50%, -50%);
+            z-index: 30; opacity: 0; pointer-events: none;
+        }
+        .trigger-shockwave { animation: ripple 1.5s ease-out forwards; }
+        @keyframes ripple {
+            0% { width: 0; height: 0; opacity: 1; border-width: 100px; }
+            100% { width: 250vmax; height: 250vmax; opacity: 0; border-width: 0px; }
+        }
+
+        .success-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            background: linear-gradient(to bottom, #ffffff, #d4af37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform: translateY(30px);
+            opacity: 0; transition: all 1s ease 0.5s;
+            padding: 0 10px; line-height: 1.1;
+        }
+
+        .meme-text {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.9rem; letter-spacing: 3px;
+            color: #d4af37; text-transform: uppercase;
+            transform: translateY(30px);
+            opacity: 0; transition: all 1s ease 1.2s;
+            padding: 0 20px;
+        }
+
+        /* IMPROVED IDENTITY BOX */
+        .identity-reveal-box {
+            margin-top: 3rem;
+            width: 90%; max-width: 500px;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(20,20,20,0.95) 100%);
+            padding: 25px;
+            border-radius: 4px;
+            position: relative;
+            transform: translateY(30px) scale(0.95);
+            opacity: 0; overflow: hidden;
+            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 2s;
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.1);
+        }
+
+        /* Scan line animation */
+        .scan-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: #d4af37;
+            box-shadow: 0 0 10px #d4af37;
+            animation: scan 2s infinite;
+            opacity: 0.5;
+        }
+        @keyframes scan { 0% {top:0;} 100% {top:100%;} }
+
+        .identity-label {
+            font-size: 0.6rem; color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase; letter-spacing: 3px;
+            margin-bottom: 10px; display: block;
+            border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;
+        }
+
+        .identity-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem; color: #fff;
+            font-style: italic;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            transition: color 0.3s ease;
+        }
+
+        /* DIVYA/KANAK SPECIAL TEXT */
+        .lucky-message {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.7rem; color: #4ade80; /* Green for safe */
+            letter-spacing: 1px; margin-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 10px; display: none;
+        }
+
+        /* FINAL FOOTER */
+        .final-credits {
+            position: absolute; bottom: 30px;
+            width: 100%; text-align: center;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem; color: rgba(255,255,255,0.3);
+            letter-spacing: 2px; opacity: 0;
+            transition: opacity 1s ease 2.5s;
+        }
+        .glow-text { color: #d4af37; text-shadow: 0 0 10px rgba(212,175,55,0.5); animation: pulse 2s infinite; }
+        .blue-glow { color: #4a90e2; text-shadow: 0 0 10px rgba(74,144,226,0.5); }
+        
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .show-msg .success-text { transform: translateY(0); opacity: 1; }
+        .show-msg .meme-text { transform: translateY(0); opacity: 1; }
+        .show-msg .identity-reveal-box { transform: translateY(0) scale(1); opacity: 1; }
+        .show-msg .final-credits { opacity: 1; }
+        
+        @media(min-width: 768px) {
+            .success-text { font-size: 5rem; }
+            .meme-text { font-size: 1.2rem; letter-spacing: 6px; }
+            .identity-value { font-size: 3.5rem; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center">
+
+    <div id="canvas-container"></div>
+    <div class="vignette"></div>
+    <div class="shockwave" id="shockwave"></div>
+
+    <div class="relative z-10 w-full max-w-[400px] px-6 perspective-1000">
+        <div class="glass-panel p-8 md:p-10" id="login-card">
+            
+            <div class="text-center mb-8">
+                <h1 class="font-['Playfair_Display'] text-4xl text-white mb-2 italic">Aether</h1>
+                <div class="w-8 h-[1px] bg-[#d4af37] mx-auto opacity-50"></div>
+                <p class="text-white/30 text-[10px] tracking-[0.2em] mt-2">SYSTEM PROTECTED</p>
+            </div>
+
+            <form onsubmit="event.preventDefault(); handleAuth();">
+                <div class="premium-input-group">
+                    <input type="text" class="premium-input" placeholder=" " id="username" required autocomplete="off">
+                    <label class="input-label">Identity Name</label>
+                </div>
+
+                <div class="premium-input-group">
+                    <input type="password" class="premium-input" placeholder=" " id="password" required>
+                    <label class="input-label">Passkey</label>
+                </div>
+
+                <button type="submit" class="gold-btn w-full py-4 rounded-sm mt-4 active:scale-95 transition-transform">
+                    Authenticate
+                </button>
+            </form>
+            
+            <div class="system-terminal" id="terminal">
+                <div class="log-line">System initialized.</div>
+                <div class="log-line">Awaiting credentials...</div>
+            </div>
+            
+            <div class="text-center mt-4 opacity-30 text-[8px] tracking-widest text-white">
+                SECURED BY HARS6X
+            </div>
+        </div>
+    </div>
+
+    <div id="success-overlay">
+        <h1 id="final-name" class="success-text">Welcome</h1>
+        <p id="final-msg" class="meme-text"></p>
+        
+        <div class="identity-reveal-box">
+            <div class="scan-line"></div>
+            <span class="identity-label">System Analysis / Gender</span>
+            <div id="identity-result" class="identity-value">Scanning...</div>
+            
+            <div id="lucky-msg" class="lucky-message">
+                TODAY IS YOUR GOOD DAY<br>OTHERWISE ALL MEMBER ARE ROASTED !!!
+            </div>
+        </div>
+
+        <div class="final-credits">
+            <p>ROAST BY <span class="glow-text">HARS6X</span></p>
+            <p style="margin-top:5px;">DATA GIVEN BY <span class="blue-glow">ASHUUUX38</span></p>
+        </div>
+    </div>
+
+    <script>
+        const sys_config = {
+            'harsh': 'Mard',
+            'ashu': 'Chakka',
+            'aman': 'Bhen ka l*da',
+            'aryan': 'ND is a R@ndi',
+            'kanak': 'Girl',
+            'divya': 'Girl',
+            'raghav': 'Chinaar',
+            'rifa': 'Capcutt'
+        };
+
+        const isMobile = window.innerWidth < 768;
+
+        // --- TERMINAL LOGIC ---
+        const terminal = document.getElementById('terminal');
+        const logs = [
+            "Connecting to server...", "Verifying hash...", 
+            "Bypassing firewall...", "Fetching Data: @ashuuux38...",
+            "Checking database...", "Analyzing Biological Data...",
+            "Secure handshake...", "System ready."
+        ];
+
+        setInterval(() => {
+            if(Math.random() > 0.6) {
+                const div = document.createElement('div');
+                div.className = 'log-line';
+                div.innerText = "> " + logs[Math.floor(Math.random() * logs.length)];
+                // Random highlight
+                if(Math.random() > 0.8) div.classList.add('highlight');
+                terminal.appendChild(div);
+                if(terminal.children.length > 5) terminal.removeChild(terminal.firstChild);
+            }
+        }, 700);
+
+        // --- 3D SCENE ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.z = isMobile ? 16 : 13;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.3;
+        container.appendChild(renderer.domElement);
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.1));
+        const keyLight = new THREE.PointLight(0xd4af37, 2.5, 30);
+        keyLight.position.set(5, 5, 5);
+        scene.add(keyLight);
+        const fillLight = new THREE.PointLight(0x4a90e2, 1.5, 30);
+        fillLight.position.set(-5, 0, 5);
+        scene.add(fillLight);
+        
+        // Liquid Sphere
+        const geometry = new THREE.IcosahedronGeometry(3.5, isMobile ? 8 : 30);
+        const material = new THREE.MeshPhysicalMaterial({
+            color: 0x050505, metalness: 0.9, roughness: 0.1,
+            clearcoat: 1.0, clearcoatRoughness: 0.1, emissive: 0x000000
+        });
+        const sphere = new THREE.Mesh(geometry, material);
+        scene.add(sphere);
+
+        // Explosion Particles
+        const particlesCount = isMobile ? 500 : 2000;
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesPos = new Float32Array(particlesCount * 3);
+        const particlesVel = [];
+
+        for(let i=0; i<particlesCount; i++) {
+            particlesPos[i*3] = 0; particlesPos[i*3+1] = 0; particlesPos[i*3+2] = 0;
+            particlesVel.push({
+                x: (Math.random() - 0.5) * 0.8,
+                y: (Math.random() - 0.5) * 0.8,
+                z: (Math.random() - 0.5) * 0.8
+            });
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(particlesPos, 3));
+        const particlesMat = new THREE.PointsMaterial({
+            color: 0xd4af37, size: isMobile ? 0.15 : 0.1,
+            transparent: true, opacity: 0
+        });
+        const explosion = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(explosion);
+
+        // Noise setup
+        const count = geometry.attributes.position.count;
+        const posAttr = geometry.attributes.position;
+        const originalPos = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+            originalPos[i * 3] = posAttr.getX(i);
+            originalPos[i * 3 + 1] = posAttr.getY(i);
+            originalPos[i * 3 + 2] = posAttr.getZ(i);
+        }
+
+        // Interaction
+        let mouseX = 0, mouseY = 0;
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX - window.innerWidth/2;
+            mouseY = e.clientY - window.innerHeight/2;
+            
+            const card = document.getElementById('login-card');
+            if(card && !card.classList.contains('fade-out')) {
+                card.style.transform = `perspective(1000px) rotateX(${(mouseY/window.innerHeight)*20}deg) rotateY(${-(mouseX/window.innerWidth)*20}deg)`;
+            }
+        });
+
+        // Animation
+        let isExploding = false;
+        let spinSpeed = 0.002;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now() * 0.001;
+
+            if(!isExploding) {
+                for (let i = 0; i < count; i++) {
+                    const ix = i*3;
+                    const x = originalPos[ix], y = originalPos[ix+1], z = originalPos[ix+2];
+                    const mod = Math.sin(x*0.5+time)*0.2 + Math.sin(y*0.3+time*1.5)*0.2 + Math.sin(z*0.5+time*0.5)*0.2;
+                    const s = 1 + mod * 0.2;
+                    posAttr.setXYZ(i, x*s, y*s, z*s);
+                }
+                posAttr.needsUpdate = true;
+                geometry.computeVertexNormals();
+                sphere.rotation.y += spinSpeed;
+                sphere.rotation.x += (mouseY * 0.0001 - sphere.rotation.x) * 0.05;
+                sphere.rotation.z += (mouseX * 0.0001 - sphere.rotation.z) * 0.05;
+            } else {
+                sphere.scale.multiplyScalar(0.9); 
+                if(sphere.scale.x < 0.1) sphere.visible = false;
+                particlesMat.opacity = 1;
+                const pos = explosion.geometry.attributes.position.array;
+                for(let i=0; i<particlesCount; i++) {
+                    pos[i*3] += particlesVel[i].x;
+                    pos[i*3+1] += particlesVel[i].y;
+                    pos[i*3+2] += particlesVel[i].z;
+                }
+                explosion.geometry.attributes.position.needsUpdate = true;
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.handleAuth = function() {
+            const name = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value;
+            const btn = document.querySelector('.gold-btn');
+            const card = document.getElementById('login-card');
+
+            // Password Check
+            if (pass !== "Hars6x") {
+                btn.innerHTML = "ACCESS DENIED";
+                btn.classList.add('error-btn');
+                card.classList.add('shake');
+                if(navigator.vibrate) navigator.vibrate(200);
+                
+                // Log Error
+                const err = document.createElement('div');
+                err.className = 'log-line'; err.style.color = 'red';
+                err.innerText = "!!! AUTH FAILURE !!!";
+                terminal.appendChild(err);
+
+                setTimeout(() => {
+                    btn.innerHTML = "Authenticate";
+                    btn.classList.remove('error-btn');
+                    card.classList.remove('shake');
+                }, 2000);
+                return;
+            }
+
+            btn.innerHTML = "BREACHING SYSTEM...";
+            
+            // Charge Effect
+            let charge = 0;
+            const intv = setInterval(() => {
+                charge += 0.1;
+                spinSpeed += 0.02;
+                sphere.material.emissive.setHex(0xd4af37);
+                sphere.material.emissiveIntensity = charge;
+                
+                // Spam Terminal
+                const spam = document.createElement('div');
+                spam.className = 'log-line highlight';
+                spam.innerText = "> DECRYPTING KEY..." + Math.floor(Math.random()*10000);
+                terminal.appendChild(spam);
+                terminal.scrollTop = terminal.scrollHeight;
+
+                if(charge > 1.5) {
+                    clearInterval(intv);
+                    // Success
+                    card.classList.add('fade-out');
+                    isExploding = true;
+                    document.getElementById('shockwave').classList.add('trigger-shockwave');
+                    if(navigator.vibrate) navigator.vibrate(500);
+
+                    const cleanName = name.toLowerCase();
+                    const gender = sys_config[cleanName] || "Unknown Species";
+                    
+                    document.getElementById('final-name').textContent = `Congratulations ${name}`;
+                    document.getElementById('final-msg').textContent = "your mother ki chewwwwww";
+                    
+                    const idRes = document.getElementById('identity-result');
+                    const luckyMsg = document.getElementById('lucky-msg');
+                    
+                    // --- LOGIC FOR DIVYA/KANAK (THE TRAP) ---
+                    if(cleanName === 'kanak' || cleanName === 'divya') {
+                        // 1. Initial Good Message
+                        idRes.textContent = gender; // "Girl"
+                        idRes.style.color = '#4ade80'; // Green
+                        luckyMsg.style.display = 'block';
+                        luckyMsg.innerHTML = "TODAY IS YOUR GOOD DAY<br>OTHERWISE ALL MEMBER ARE ROASTED !!!";
+
+                        // 2. THE SWITCH (3 Seconds Later)
+                        setTimeout(() => {
+                            if(navigator.vibrate) navigator.vibrate([100,50,100]); // Glitch vibrate
+                            idRes.textContent = "R@NDS";
+                            idRes.style.color = '#ff4b4b'; // Turn Red
+                            luckyMsg.innerHTML = '<span style="color:#ff4b4b; font-size: 1.5rem; font-weight: bold;">oopss !!</span><br>sorry you are roasted by ashuuux38';
+                        }, 3000); // 3000ms = 3 seconds
+
+                    } else {
+                        // NORMAL ROAST MODE
+                        idRes.textContent = gender;
+                        if(cleanName !== 'harsh') idRes.style.color = '#ff4b4b'; // Red
+                        else idRes.style.color = '#d4af37'; // Gold
+                        luckyMsg.style.display = 'none';
+                    }
+
+                    const ov = document.getElementById('success-overlay');
+                    ov.style.opacity = '1';
+                    setTimeout(() => ov.classList.add('show-msg'), 500);
+                }
+            }, 50);
+        }
+    </script>
+</body>
+</html>
